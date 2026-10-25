@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ofrenda: a remembrance page, made on your own computer</title>
+  <style>
+    :root {
+      --bg: #17110d;
+      --card: #231a14;
+      --border: #3b2c20;
+      --text: #f3e7d6;
+      --muted: #b9a58c;
+      --marigold: #f2a33a;
+      --marigold-soft: rgba(242, 163, 58, 0.14);
+      --ok: #8fcf9a;
+      --bad: #e58b7a;
+      --serif: Georgia, 'Times New Roman', serif;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 50% -10%, rgba(242, 163, 58, 0.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 20px 80px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 28px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--card);
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .pill.ready .dot { background: var(--ok); }
+    .pill.problem .dot { background: var(--bad); }
+
+    .pill button {
+      border: 0;
+      background: none;
+      padding: 0;
+      color: var(--marigold);
+      font: inherit;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    header { text-align: center; margin-bottom: 36px; }
+
+    .flame {
+      font-size: 34px;
+      line-height: 1;
+      filter: drop-shadow(0 0 14px rgba(242, 163, 58, 0.8));
+    }
+
+    h1 {
+      margin: 10px 0 8px;
+      font-family: var(--serif);
+      font-weight: normal;
+      font-size: 44px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 0 auto;
+      max-width: 520px;
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+
+    .card h2 {
+      margin: 0 0 6px;
+      font-family: var(--serif);
+      font-weight: normal;
+      font-size: 22px;
+      color: var(--marigold);
+    }
+
+    .card p { margin: 0; color: var(--muted); }
+
+    #problem {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px solid #6b3b30;
+      border-radius: 10px;
+      background: rgba(229, 139, 122, 0.1);
+      color: var(--bad);
+    }
+
+    footer {
+      margin-top: 48px;
+      text-align: center;
+      font-size: 14px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <div class="pill" id="status" role="status" aria-live="polite">
+        <span class="dot"></span>
+        <span id="statusText">Checking the local model...</span>
+        <button type="button" id="recheck">recheck</button>
+      </div>
+    </div>
+
+    <header>
+      <div class="flame" aria-hidden="true">&#128367;</div>
+      <h1>Ofrenda</h1>
+      <p class="subtitle">
+        Build a small remembrance page for someone you miss, using your own words and photos.
+        It runs on your own computer, and nothing is uploaded.
+      </p>
+    </header>
+
+    <section class="card">
+      <h2>Getting ready</h2>
+      <p>Once the local model is ready, you will be able to add a name, a few memories and photos here.</p>
+      <div id="problem" role="alert"></div>
+    </section>
+
+    <footer>Your memories and photos never leave this computer.</footer>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const problemEl = document.getElementById('problem');
+
+    async function checkHealth() {
+      statusEl.className = 'pill';
+      statusText.textContent = 'Checking the local model...';
+      problemEl.style.display = 'none';
+
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        if (data.ok) {
+          statusEl.className = 'pill ready';
+          statusText.textContent = data.message;
+        } else {
+          statusEl.className = 'pill problem';
+          statusText.textContent = 'Local model not ready';
+          problemEl.textContent = data.message;
+          problemEl.style.display = 'block';
+        }
+      } catch (err) {
+        statusEl.className = 'pill problem';
+        statusText.textContent = 'Cannot reach the app server';
+        problemEl.textContent = 'The Ofrenda server is not answering. Start it with: npm start';
+        problemEl.style.display = 'block';
+      }
+    }
+
+    document.getElementById('recheck').addEventListener('click', checkHealth);
+    checkHealth();
+  </script>
+</body>
+</html>
