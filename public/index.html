@@ -186,6 +186,42 @@
     }
     button.link:hover { color: var(--bad); }
 
+    #photoError {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 14px;
+      border: 1px solid #6b3b30;
+      border-radius: 10px;
+      background: rgba(229, 139, 122, 0.1);
+      color: var(--bad);
+      font-size: 15px;
+    }
+
+    #photoGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .photo {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px;
+      background: #1a130e;
+    }
+
+    .photo img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .photo input[type="text"] { margin-top: 8px; padding: 8px 10px; font-size: 14px; }
+    .photo .remove-photo { margin-top: 6px; }
+
     #problem {
       display: none;
       margin-bottom: 20px;
@@ -253,6 +289,21 @@
         <button type="button" class="secondary" id="addMemory">Add another memory</button>
         <span class="counter" id="memoryCount"></span>
       </div>
+    </section>
+
+    <section class="card" id="photosCard">
+      <h2>3. Photos <span class="optional">(optional)</span></h2>
+      <p class="hint">
+        Up to 4 photos. If you add a caption, the remembrance uses your words. If you leave it blank,
+        the local model will describe only what is visible in the photo, and you can edit it before saving.
+      </p>
+      <div class="row">
+        <button type="button" class="secondary" id="addPhoto">Choose photos</button>
+        <span class="counter" id="photoCount"></span>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden>
+      </div>
+      <div id="photoError" role="alert"></div>
+      <div id="photoGrid"></div>
     </section>
 
     <footer>Your memories and photos never leave this computer.</footer>
@@ -352,6 +403,116 @@
       memoryList.lastElementChild.querySelector('textarea').focus();
     });
     addMemory('');
+
+    // ---- Photos ----
+    const MAX_PHOTOS = 4;
+    const MAX_SIDE = 1024;
+    const photos = []; // { id, data (base64 JPEG, no prefix), url (for the thumbnail), caption }
+    let nextPhotoId = 1;
+
+    const photoInput = document.getElementById('photoInput');
+    const photoGrid = document.getElementById('photoGrid');
+    const photoCount = document.getElementById('photoCount');
+    const photoError = document.getElementById('photoError');
+    const addPhotoBtn = document.getElementById('addPhoto');
+
+    function showPhotoError(message) {
+      photoError.textContent = message;
+      photoError.style.display = message ? 'block' : 'none';
+    }
+
+    // Shrink a photo in the browser so it is small enough to send to the local model.
+    function resizePhoto(file) {
+      return new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve({ data: dataUrl.split(',')[1], url: dataUrl });
+          } catch (err) {
+            reject(err);
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('decode'));
+        };
+        img.src = objectUrl;
+      });
+    }
+
+    function renderPhotos() {
+      photoGrid.textContent = '';
+      photos.forEach((photo) => {
+        const card = document.createElement('div');
+        card.className = 'photo';
+
+        const img = document.createElement('img');
+        img.src = photo.url;
+        img.alt = 'Your photo';
+
+        const caption = document.createElement('input');
+        caption.type = 'text';
+        caption.maxLength = 120;
+        caption.placeholder = 'Caption (optional)';
+        caption.setAttribute('aria-label', 'Photo caption');
+        caption.value = photo.caption || '';
+        caption.addEventListener('input', () => { photo.caption = caption.value; });
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'link remove-photo';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => {
+          photos.splice(photos.indexOf(photo), 1);
+          showPhotoError('');
+          renderPhotos();
+        });
+
+        card.append(img, caption, remove);
+        photoGrid.append(card);
+      });
+      photoCount.textContent = `${photos.length} of ${MAX_PHOTOS}`;
+      addPhotoBtn.disabled = photos.length >= MAX_PHOTOS;
+    }
+
+    async function addPhotoFiles(fileList) {
+      showPhotoError('');
+      const files = Array.from(fileList);
+      let skippedForLimit = 0;
+      let unsupported = 0;
+
+      for (const file of files) {
+        if (photos.length >= MAX_PHOTOS) { skippedForLimit++; continue; }
+        try {
+          const { data, url } = await resizePhoto(file);
+          photos.push({ id: nextPhotoId++, data, url, caption: '' });
+        } catch (err) {
+          unsupported++;
+        }
+      }
+
+      const messages = [];
+      if (unsupported) messages.push("This photo format isn't supported. Try a JPEG or PNG. (HEIC files from some phones can't be opened by the browser.)");
+      if (skippedForLimit) messages.push(`Only ${MAX_PHOTOS} photos are allowed, so ${skippedForLimit} were not added.`);
+      showPhotoError(messages.join(' '));
+      renderPhotos();
+    }
+
+    addPhotoBtn.addEventListener('click', () => photoInput.click());
+    photoInput.addEventListener('change', () => {
+      addPhotoFiles(photoInput.files);
+      photoInput.value = ''; // allow choosing the same file again
+    });
+    renderPhotos();
   </script>
 </body>
 </html>
