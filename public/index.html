@@ -146,6 +146,46 @@
 
     .card + .card { margin-top: 20px; }
 
+    textarea { resize: vertical; min-height: 84px; line-height: 1.45; }
+
+    .memory { margin-top: 14px; }
+    .memory-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+    .counter { font-size: 14px; color: var(--muted); }
+
+    button.secondary, button.link {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      padding: 9px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--marigold);
+    }
+    button.secondary:hover:not(:disabled) { border-color: var(--marigold); background: var(--marigold-soft); }
+    button.secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    button.link {
+      border: 0;
+      background: none;
+      padding: 0;
+      color: var(--muted);
+      font-size: 14px;
+      text-decoration: underline;
+    }
+    button.link:hover { color: var(--bad); }
+
     #problem {
       display: none;
       margin-bottom: 20px;
@@ -202,6 +242,19 @@
       <input id="favourites" type="text" maxlength="120" autocomplete="off" placeholder="e.g. mango lassi, old Rafi songs, marigolds">
     </section>
 
+    <section class="card" id="memoriesCard">
+      <h2>2. Memories</h2>
+      <p class="hint">
+        Write a few things you remember, in your own words. The remembrance will only use what you write here,
+        so short and true is better than long and polished.
+      </p>
+      <div id="memoryList"></div>
+      <div class="row">
+        <button type="button" class="secondary" id="addMemory">Add another memory</button>
+        <span class="counter" id="memoryCount"></span>
+      </div>
+    </section>
+
     <footer>Your memories and photos never leave this computer.</footer>
   </main>
 
@@ -237,6 +290,68 @@
 
     document.getElementById('recheck').addEventListener('click', checkHealth);
     checkHealth();
+
+    // ---- Memories ----
+    const MAX_MEMORIES = 8;
+    const MAX_MEMORY_LENGTH = 400;
+    const memoryList = document.getElementById('memoryList');
+    const addMemoryBtn = document.getElementById('addMemory');
+    const memoryCount = document.getElementById('memoryCount');
+
+    function renumberMemories() {
+      const items = memoryList.querySelectorAll('.memory');
+      items.forEach((item, index) => {
+        item.querySelector('.memory-label').textContent = `Memory ${index + 1}`;
+        // Keep at least one box on the page; only show Remove when there is more than one.
+        item.querySelector('.remove-memory').style.display = items.length > 1 ? '' : 'none';
+      });
+      memoryCount.textContent = `${items.length} of ${MAX_MEMORIES}`;
+      addMemoryBtn.disabled = items.length >= MAX_MEMORIES;
+    }
+
+    function addMemory(text) {
+      if (memoryList.querySelectorAll('.memory').length >= MAX_MEMORIES) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'memory';
+
+      const head = document.createElement('div');
+      head.className = 'memory-head';
+      const label = document.createElement('span');
+      label.className = 'memory-label';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'link remove-memory';
+      remove.textContent = 'Remove';
+      head.append(label, remove);
+
+      const box = document.createElement('textarea');
+      box.maxLength = MAX_MEMORY_LENGTH;
+      box.placeholder = 'e.g. She always saved the last piece of mithai for me, wrapped in a napkin.';
+      box.setAttribute('aria-label', 'Memory text');
+      if (text) box.value = text;
+
+      remove.addEventListener('click', () => {
+        wrap.remove();
+        renumberMemories();
+      });
+
+      wrap.append(head, box);
+      memoryList.append(wrap);
+      renumberMemories();
+    }
+
+    function getMemories() {
+      return Array.from(memoryList.querySelectorAll('textarea'))
+        .map((box) => box.value.trim())
+        .filter((value) => value.length > 0);
+    }
+
+    addMemoryBtn.addEventListener('click', () => {
+      addMemory('');
+      memoryList.lastElementChild.querySelector('textarea').focus();
+    });
+    addMemory('');
   </script>
 </body>
 </html>
