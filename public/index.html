@@ -115,9 +115,40 @@
 
     .card p { margin: 0; color: var(--muted); }
 
+    .hint { margin-bottom: 4px; font-size: 15px; }
+
+    label {
+      display: block;
+      margin: 18px 0 6px;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .optional { color: var(--muted); font-size: 14px; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #1a130e;
+      color: var(--text);
+      font: inherit;
+    }
+
+    input[type="text"]::placeholder, textarea::placeholder { color: #7d6c58; }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--marigold);
+      box-shadow: 0 0 0 3px var(--marigold-soft);
+    }
+
+    .card + .card { margin-top: 20px; }
+
     #problem {
       display: none;
-      margin-top: 16px;
+      margin-bottom: 20px;
       padding: 12px 14px;
       border: 1px solid #6b3b30;
       border-radius: 10px;
@@ -152,10 +183,23 @@
       </p>
     </header>
 
-    <section class="card">
-      <h2>Getting ready</h2>
-      <p>Once the local model is ready, you will be able to add a name, a few memories and photos here.</p>
-      <div id="problem" role="alert"></div>
+    <div id="problem" role="alert"></div>
+
+    <section class="card" id="whoCard">
+      <h2>1. Who are you remembering?</h2>
+      <p class="hint">Only the name is required. Everything else is optional and stays on this computer.</p>
+
+      <label for="name">Their name</label>
+      <input id="name" type="text" maxlength="60" autocomplete="off" placeholder="e.g. Nani">
+
+      <label for="relation">Who were they to you? <span class="optional">(optional)</span></label>
+      <input id="relation" type="text" maxlength="60" autocomplete="off" placeholder="e.g. my grandmother">
+
+      <label for="years">Years <span class="optional">(optional)</span></label>
+      <input id="years" type="text" maxlength="20" autocomplete="off" placeholder="e.g. 1941 to 2023">
+
+      <label for="favourites">Favourite things <span class="optional">(optional)</span></label>
+      <input id="favourites" type="text" maxlength="120" autocomplete="off" placeholder="e.g. mango lassi, old Rafi songs, marigolds">
     </section>
 
     <footer>Your memories and photos never leave this computer.</footer>
