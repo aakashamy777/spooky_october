@@ -186,6 +186,19 @@
     }
     button.link:hover { color: var(--bad); }
 
+    button.primary {
+      padding: 12px 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--marigold);
+      color: #2a1a05;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+    button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
     #photoError {
       display: none;
       margin-top: 14px;
@@ -304,6 +317,15 @@
       </div>
       <div id="photoError" role="alert"></div>
       <div id="photoGrid"></div>
+    </section>
+
+    <section class="card" id="finishCard">
+      <h2>4. Ready?</h2>
+      <p class="hint" id="readyHint">Add a name and at least one memory or photo to continue.</p>
+      <div class="row">
+        <button type="button" class="primary" id="buildBtn" disabled>Write the remembrance</button>
+        <button type="button" class="link" id="clearAll">Clear everything</button>
+      </div>
     </section>
 
     <footer>Your memories and photos never leave this computer.</footer>
@@ -505,6 +527,7 @@
       if (skippedForLimit) messages.push(`Only ${MAX_PHOTOS} photos are allowed, so ${skippedForLimit} were not added.`);
       showPhotoError(messages.join(' '));
       renderPhotos();
+      updateReady();
     }
 
     addPhotoBtn.addEventListener('click', () => photoInput.click());
@@ -513,6 +536,59 @@
       photoInput.value = ''; // allow choosing the same file again
     });
     renderPhotos();
+
+    // ---- Form state, validation and reset ----
+    const nameInput = document.getElementById('name');
+    const relationInput = document.getElementById('relation');
+    const yearsInput = document.getElementById('years');
+    const favouritesInput = document.getElementById('favourites');
+    const buildBtn = document.getElementById('buildBtn');
+    const readyHint = document.getElementById('readyHint');
+
+    // Everything the user typed or chose, cleaned up and ready to send to the model.
+    function collectForm() {
+      return {
+        name: nameInput.value.trim(),
+        relation: relationInput.value.trim(),
+        years: yearsInput.value.trim(),
+        favourites: favouritesInput.value.trim(),
+        memories: getMemories(),
+        photos: photos.map((p) => ({ data: p.data, caption: (p.caption || '').trim() })),
+      };
+    }
+
+    function updateReady() {
+      const form = collectForm();
+      const hasStuff = form.memories.length > 0 || form.photos.length > 0;
+      const ready = form.name.length > 0 && hasStuff;
+      buildBtn.disabled = !ready;
+      if (ready) {
+        readyHint.textContent = 'Everything stays on this computer. You can edit the result before saving.';
+      } else if (!form.name) {
+        readyHint.textContent = 'Add their name to continue.';
+      } else {
+        readyHint.textContent = 'Add at least one memory or photo to continue.';
+      }
+    }
+
+    function clearEverything() {
+      if (!confirm('Clear the name, memories and photos from this page?')) return;
+      [nameInput, relationInput, yearsInput, favouritesInput].forEach((el) => { el.value = ''; });
+      memoryList.textContent = '';
+      addMemory('');
+      photos.length = 0;
+      showPhotoError('');
+      renderPhotos();
+      updateReady();
+    }
+
+    // The form changes in several places, so listen once at the top and re-check each time.
+    document.addEventListener('input', updateReady);
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('.remove-memory, .remove-photo, #addMemory')) updateReady();
+    });
+    document.getElementById('clearAll').addEventListener('click', clearEverything);
+    updateReady();
   </script>
 </body>
 </html>
