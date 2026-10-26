@@ -4,7 +4,8 @@
   "description": "A local-first remembrance page builder. Gemma 3 runs on your own computer through Ollama.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "license": "MIT",
   "engines": {
