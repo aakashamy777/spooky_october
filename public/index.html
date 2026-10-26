@@ -224,6 +224,17 @@
     .notice details { margin-top: 6px; color: var(--muted); }
     .notice summary { cursor: pointer; color: var(--marigold); }
 
+    #ofrendaError { display: none; margin-top: 14px; padding: 10px 14px; border: 1px solid #6b3b30; border-radius: 10px; background: rgba(229, 139, 122, 0.1); color: var(--bad); font-size: 15px; }
+
+    #previewFrame {
+      width: 100%;
+      height: 640px;
+      margin: 14px 0 4px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #150f0b;
+    }
+
     #itemChips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
     .chip {
       display: inline-flex;
@@ -400,11 +411,28 @@
       </div>
 
       <div id="resultPhotos"></div>
+
+      <div class="row" style="margin-top: 26px">
+        <button type="button" class="primary" id="buildOfrenda">Build the ofrenda page</button>
+        <button type="button" class="link" id="writeAgain">Write it again</button>
+      </div>
+      <div id="ofrendaError" role="alert"></div>
+    </section>
+
+    <section class="card" id="previewCard" hidden>
+      <h2>Your ofrenda</h2>
+      <p class="hint">This is a preview. The download is one file you can keep, print or send. It has no scripts and makes no web requests.</p>
+      <iframe id="previewFrame" sandbox title="Preview of your ofrenda page"></iframe>
+      <div class="row">
+        <button type="button" class="primary" id="downloadBtn">Download as one HTML file</button>
+        <button type="button" class="link" id="backToEditing">Back to editing</button>
+      </div>
     </section>
 
     <footer>Your memories and photos never leave this computer.</footer>
   </main>
 
+  <script src="/ofrenda.js"></script>
   <script>
     const statusEl = document.getElementById('status');
     const statusText = document.getElementById('statusText');
@@ -760,15 +788,15 @@
     function renderResultPhotos() {
       const holder = document.getElementById('resultPhotos');
       holder.textContent = '';
-      if (photos.length === 0) return;
+      if (current.photoUrls.length === 0) return;
 
       holder.append(el('label', '', 'Photo captions'));
       const grid = el('div', 'photo-grid');
-      photos.forEach((photo, index) => {
+      current.photoUrls.forEach((url, index) => {
         const info = current.photoCaptions[index] || { caption: '', source: 'you' };
         const card = el('div', 'photo');
         const img = document.createElement('img');
-        img.src = photo.url;
+        img.src = url;
         img.alt = info.caption || 'Your photo';
         const input = document.createElement('input');
         input.type = 'text';
@@ -788,10 +816,15 @@
     function showResult(form, result) {
       current = {
         name: form.name,
+        relation: form.relation,
+        years: form.years,
         title: result.title,
         items: [...result.ofrendaItems],
         photoCaptions: result.photos.map((p) => ({ ...p })),
+        // Keep the photos as they were when the text was written, so captions stay matched.
+        photoUrls: photos.map((p) => p.url),
       };
+      previewCard.hidden = true;
 
       document.getElementById('resultTitle').textContent = result.title;
       document.getElementById('resultText').value = result.remembrance;
@@ -835,6 +868,66 @@
       if (event.key === 'Enter') { event.preventDefault(); addItemFromInput(); }
     });
     buildBtn.addEventListener('click', startRemembrance);
+
+    // ---- The ofrenda page ----
+    const previewCard = document.getElementById('previewCard');
+    const previewFrame = document.getElementById('previewFrame');
+    const ofrendaError = document.getElementById('ofrendaError');
+    let ofrendaHtml = '';
+
+    function showOfrendaError(message) {
+      ofrendaError.textContent = message;
+      ofrendaError.style.display = message ? 'block' : 'none';
+    }
+
+    function makeOfrendaHtml() {
+      return Ofrenda.buildOfrendaHtml({
+        name: current.name,
+        relation: current.relation,
+        years: current.years,
+        title: current.title,
+        text: document.getElementById('resultText').value,
+        items: current.items,
+        photos: current.photoUrls.map((url, i) => ({ url, caption: (current.photoCaptions[i] || {}).caption || '' })),
+        madeOn: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      });
+    }
+
+    document.getElementById('buildOfrenda').addEventListener('click', () => {
+      showOfrendaError('');
+      if (!current) return;
+      if (!document.getElementById('resultText').value.trim()) {
+        showOfrendaError('The remembrance is empty. Please write or restore some words first.');
+        return;
+      }
+      ofrendaHtml = makeOfrendaHtml();
+      previewFrame.srcdoc = ofrendaHtml;
+      previewCard.hidden = false;
+      previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      if (!ofrendaHtml) return;
+      const blob = new Blob([ofrendaHtml], { type: 'text/html' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `ofrenda-${Ofrenda.fileSlug(current.name)}.html`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    });
+
+    document.getElementById('backToEditing').addEventListener('click', () => {
+      previewCard.hidden = true;
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.getElementById('writeAgain').addEventListener('click', () => {
+      resultCard.hidden = true;
+      previewCard.hidden = true;
+      startRemembrance();
+    });
   </script>
 </body>
 </html>
