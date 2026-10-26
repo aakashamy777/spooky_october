@@ -199,6 +199,54 @@
     button.primary:hover:not(:disabled) { filter: brightness(1.08); }
     button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    #writeError {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 14px;
+      border: 1px solid #6b3b30;
+      border-radius: 10px;
+      background: rgba(229, 139, 122, 0.1);
+      color: var(--bad);
+      font-size: 15px;
+    }
+
+    textarea.serif { font-family: var(--serif); font-size: 18px; line-height: 1.6; }
+
+    .notice {
+      margin: 14px 0 0;
+      padding: 10px 14px;
+      border: 1px solid #5c4a2a;
+      border-radius: 10px;
+      background: var(--marigold-soft);
+      color: var(--text);
+      font-size: 15px;
+    }
+    .notice details { margin-top: 6px; color: var(--muted); }
+    .notice summary { cursor: pointer; color: var(--marigold); }
+
+    #itemChips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 6px 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #1a130e;
+      font-size: 15px;
+    }
+    .chip button {
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .chip button:hover { color: var(--bad); }
+
+    .photo .source { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
     #photoError {
       display: none;
       margin-top: 14px;
@@ -210,7 +258,7 @@
       font-size: 15px;
     }
 
-    #photoGrid {
+    #photoGrid, .photo-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 14px;
@@ -326,6 +374,32 @@
         <button type="button" class="primary" id="buildBtn" disabled>Write the remembrance</button>
         <button type="button" class="link" id="clearAll">Clear everything</button>
       </div>
+      <div id="writeError" role="alert"></div>
+    </section>
+
+    <section class="card" id="progressCard" hidden>
+      <h2>Writing...</h2>
+      <p id="progressStep">Starting...</p>
+      <p class="counter" id="progressTime"></p>
+    </section>
+
+    <section class="card" id="resultCard" hidden>
+      <h2 id="resultTitle"></h2>
+      <p class="hint">Read it slowly and change anything that is not right. It is your remembrance, not the model's.</p>
+
+      <div id="notices"></div>
+
+      <label for="resultText">The remembrance</label>
+      <textarea id="resultText" class="serif" rows="9"></textarea>
+
+      <label>Things for the ofrenda <span class="optional">(only what you wrote about)</span></label>
+      <div id="itemChips"></div>
+      <div class="row">
+        <input id="newItem" type="text" maxlength="40" placeholder="Add something they loved" style="max-width: 280px">
+        <button type="button" class="secondary" id="addItem">Add</button>
+      </div>
+
+      <div id="resultPhotos"></div>
     </section>
 
     <footer>Your memories and photos never leave this computer.</footer>
@@ -557,11 +631,13 @@
       };
     }
 
+    let busy = false; // true while the model is writing
+
     function updateReady() {
       const form = collectForm();
       const hasStuff = form.memories.length > 0 || form.photos.length > 0;
       const ready = form.name.length > 0 && hasStuff;
-      buildBtn.disabled = !ready;
+      buildBtn.disabled = busy || !ready;
       if (ready) {
         readyHint.textContent = 'Everything stays on this computer. You can edit the result before saving.';
       } else if (!form.name) {
@@ -589,6 +665,176 @@
     });
     document.getElementById('clearAll').addEventListener('click', clearEverything);
     updateReady();
+
+    // ---- Writing the remembrance ----
+    const writeError = document.getElementById('writeError');
+    const progressCard = document.getElementById('progressCard');
+    const progressStep = document.getElementById('progressStep');
+    const progressTime = document.getElementById('progressTime');
+    const resultCard = document.getElementById('resultCard');
+
+    // What the person is editing now. The next step turns this into the ofrenda page.
+    let current = null; // { name, title, items: [], photoCaptions: [{ caption, source }] }
+
+    function showWriteError(message) {
+      writeError.textContent = message;
+      writeError.style.display = message ? 'block' : 'none';
+    }
+
+    // Small helper so model text always goes in as plain text, never as HTML.
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+    async function startRemembrance() {
+      showWriteError('');
+      resultCard.hidden = true;
+      busy = true;
+      updateReady();
+      progressCard.hidden = false;
+      progressStep.textContent = 'Starting...';
+      progressTime.textContent = '';
+      const startedAt = Date.now();
+
+      try {
+        const form = collectForm();
+        const response = await fetch('/api/remember', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Could not start writing.');
+
+        while (true) {
+          const poll = await (await fetch(`/api/remember/${data.jobId}`)).json();
+          if (!poll.ok) throw new Error(poll.error || 'Lost track of the job.');
+          progressStep.textContent = `${poll.step}...`;
+          const seconds = Math.round((Date.now() - startedAt) / 1000);
+          progressTime.textContent = `${seconds} seconds so far. A small model on your own computer takes about a minute.`;
+          if (poll.status === 'done') { showResult(form, poll.result); break; }
+          if (poll.status === 'error') throw new Error(poll.error);
+          await wait(1500);
+        }
+      } catch (err) {
+        showWriteError(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        busy = false;
+        progressCard.hidden = true;
+        updateReady();
+      }
+    }
+
+    function addNotice(container, message, details) {
+      const box = el('div', 'notice');
+      box.append(el('span', '', message));
+      if (details && details.length) {
+        const wrap = document.createElement('details');
+        wrap.append(el('summary', '', 'Show what was removed'));
+        details.forEach((line) => wrap.append(el('div', '', line)));
+        box.append(wrap);
+      }
+      container.append(box);
+    }
+
+    function renderChips() {
+      const holder = document.getElementById('itemChips');
+      holder.textContent = '';
+      current.items.forEach((item, index) => {
+        const chip = el('span', 'chip');
+        chip.append(el('span', '', item));
+        const remove = el('button', '', '×');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', `Remove ${item}`);
+        remove.addEventListener('click', () => { current.items.splice(index, 1); renderChips(); });
+        chip.append(remove);
+        holder.append(chip);
+      });
+    }
+
+    function renderResultPhotos() {
+      const holder = document.getElementById('resultPhotos');
+      holder.textContent = '';
+      if (photos.length === 0) return;
+
+      holder.append(el('label', '', 'Photo captions'));
+      const grid = el('div', 'photo-grid');
+      photos.forEach((photo, index) => {
+        const info = current.photoCaptions[index] || { caption: '', source: 'you' };
+        const card = el('div', 'photo');
+        const img = document.createElement('img');
+        img.src = photo.url;
+        img.alt = info.caption || 'Your photo';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.maxLength = 140;
+        input.value = info.caption;
+        input.setAttribute('aria-label', 'Photo caption');
+        input.addEventListener('input', () => { info.caption = input.value; info.source = 'you'; });
+        const source = el('p', 'source', info.source === 'you'
+          ? 'Your words'
+          : 'Described by the local model. Edit it if it is wrong.');
+        card.append(img, input, source);
+        grid.append(card);
+      });
+      holder.append(grid);
+    }
+
+    function showResult(form, result) {
+      current = {
+        name: form.name,
+        title: result.title,
+        items: [...result.ofrendaItems],
+        photoCaptions: result.photos.map((p) => ({ ...p })),
+      };
+
+      document.getElementById('resultTitle').textContent = result.title;
+      document.getElementById('resultText').value = result.remembrance;
+
+      const notices = document.getElementById('notices');
+      notices.textContent = '';
+      if (result.removedSentences.length > 0) {
+        addNotice(
+          notices,
+          `I removed ${result.removedSentences.length} sentence${result.removedSentences.length === 1 ? '' : 's'} that contained details you did not write.`,
+          result.removedSentences
+        );
+      }
+      if (result.usedFallback) {
+        addNotice(notices, 'The model kept adding details you did not write, so this uses your own words instead.');
+      }
+      if (result.warnings.length > 0) {
+        addNotice(notices, `Please check these: ${result.warnings.join(', ')}`);
+      }
+      if (result.droppedItems.length > 0) {
+        addNotice(notices, `Left out of the ofrenda because you did not mention them: ${result.droppedItems.join(', ')}`);
+      }
+
+      renderChips();
+      renderResultPhotos();
+      resultCard.hidden = false;
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function addItemFromInput() {
+      const input = document.getElementById('newItem');
+      const text = input.value.trim().slice(0, 40);
+      if (!text || !current || current.items.length >= 8) return;
+      if (!current.items.some((i) => i.toLowerCase() === text.toLowerCase())) current.items.push(text);
+      input.value = '';
+      renderChips();
+    }
+
+    document.getElementById('addItem').addEventListener('click', addItemFromInput);
+    document.getElementById('newItem').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); addItemFromInput(); }
+    });
+    buildBtn.addEventListener('click', startRemembrance);
   </script>
 </body>
 </html>
