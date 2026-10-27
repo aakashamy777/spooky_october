@@ -72,6 +72,19 @@ test('a JSON web token is hidden', () => {
   assert.equal(redact(`curl --data ${jwt} x`).text, 'curl --data [hidden] x');
 });
 
+test('a long mixed string that looks like a key or hash is hidden', () => {
+  assert.equal(redact('echo 3f2a9c1b7d4e5f60a1b2c3d4e5f6071829304a5b').text, 'echo [hidden]');
+  assert.equal(redact('docker login -p Zm9vYmFyMTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3A=').text.includes('Zm9v'), false);
+});
+
+test('long words without digits and short ids are kept', () => {
+  assert.equal(
+    redact('echo supercalifragilisticexpialidocious-and-more-words').text,
+    'echo supercalifragilisticexpialidocious-and-more-words',
+  );
+  assert.equal(redact('git checkout 3f2a9c1').text, 'git checkout 3f2a9c1');
+});
+
 test('the number of hidden secrets is counted', () => {
   const result = redact('API_KEY=a SECRET_TOKEN=b run --password c');
   assert.equal(result.hidden, 3);
