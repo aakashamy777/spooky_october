@@ -38,6 +38,40 @@ test('mkdir -p and other harmless -p flags are not touched', () => {
   assert.equal(redact('cp -p one two').text, 'cp -p one two');
 });
 
+test('a word that only contains a secret word inside it is not a secret name', () => {
+  assert.equal(redact('PASSENGER_COUNT=4 ./run').text, 'PASSENGER_COUNT=4 ./run');
+});
+
+test('credentials inside a URL are hidden but the host stays', () => {
+  assert.equal(
+    redact('git clone https://me:ghpass@github.com/me/repo.git').text,
+    'git clone https://[hidden]@github.com/me/repo.git',
+  );
+  assert.equal(redact('curl https://example.com/a:b').text, 'curl https://example.com/a:b');
+});
+
+test('Authorization headers are hidden', () => {
+  assert.equal(
+    redact('curl -H "Authorization: Bearer abc.def.ghi" https://api.example.com').text,
+    'curl -H "Authorization: Bearer [hidden]" https://api.example.com',
+  );
+  assert.equal(redact("curl -H 'Authorization: Basic dXNlcjpwYXNz' x").text, "curl -H 'Authorization: Basic [hidden]' x");
+});
+
+test('well-known token shapes are hidden wherever they appear', () => {
+  const github = 'ghp_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4';
+  const openai = 'sk-' + 'abcdefghijklmnopqrstuvwx';
+  const aws = 'AKIA' + 'ABCDEFGHIJKLMNOP';
+  assert.equal(redact(`echo ${github}`).text, 'echo [hidden]');
+  assert.equal(redact(`echo ${openai}`).text, 'echo [hidden]');
+  assert.equal(redact(`echo ${aws}`).text, 'echo [hidden]');
+});
+
+test('a JSON web token is hidden', () => {
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.abcdefghijk';
+  assert.equal(redact(`curl --data ${jwt} x`).text, 'curl --data [hidden] x');
+});
+
 test('the number of hidden secrets is counted', () => {
   const result = redact('API_KEY=a SECRET_TOKEN=b run --password c');
   assert.equal(result.hidden, 3);
