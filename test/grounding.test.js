@@ -6,7 +6,7 @@ const { findUngrounded, checkWhisper, tidyWhisper } = require('../lib/grounding'
 
 // What the model is told. A whisper may use only what is in here.
 const facts = 'Command: npm test\nResult: it failed with exit code 1.\nIt ran for 4 seconds.\n' +
-  'The same command has failed 3 times in a row.\nThe hour is deep night.';
+  'The same command has failed 3 times in a row.\nTime of day: deep night.';
 
 test('a whisper that only uses the facts is clean', () => {
   const result = findUngrounded('Three times now, and npm test still answers with a 1. The night does not help.', facts);
