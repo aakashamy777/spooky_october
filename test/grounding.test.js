@@ -2,61 +2,77 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { findUngrounded, groundItems } = require('../lib/grounding');
+const { findUngrounded, checkWhisper, tidyWhisper } = require('../lib/grounding');
 
-const input = 'Nani my grandmother 1941 to 2023. She saved the last mithai for me. ' +
-  'She loved Rafi songs and marigolds. Every Diwali she lit lamps on the porch.';
+// What the model is told. A whisper may use only what is in here.
+const facts = 'Command: npm test\nResult: it failed with exit code 1.\nIt ran for 4 seconds.\n' +
+  'The same command has failed 3 times in a row.\nThe hour is deep night.';
 
-test('text that only uses the input is clean', () => {
-  const out = 'I remember Nani saving the last mithai for me. She loved Rafi songs and marigolds.';
-  const result = findUngrounded(out, input);
+test('a whisper that only uses the facts is clean', () => {
+  const result = findUngrounded('Three times now, and npm test still answers with a 1. The night does not help.', facts);
   assert.equal(result.any, false);
 });
 
-test('an invented year or number is caught', () => {
-  const result = findUngrounded('In 1987 she moved to a small town.', input);
-  assert.deepEqual(result.numbers, ['1987']);
+test('an invented number is caught', () => {
+  assert.deepEqual(findUngrounded('It failed 9 times.', facts).numbers, ['9']);
 });
 
-test('a number from the input is allowed', () => {
-  assert.equal(findUngrounded('She was born in 1941.', input).numbers.length, 0);
+test('a number from the facts is allowed', () => {
+  assert.equal(findUngrounded('It took 4 seconds to fail.', facts).numbers.length, 0);
+});
+
+test('a number spelled as a word must match a real number too', () => {
+  assert.deepEqual(findUngrounded('Seven times it has failed.', facts).numbers, ['seven']);
+  assert.equal(findUngrounded('Three times it has failed.', facts).numbers.length, 0);
+  assert.equal(findUngrounded('Twice is a coincidence.', facts).numbers.length, 1);
 });
 
 test('an invented name or place is caught', () => {
-  const result = findUngrounded('She often walked to Jaipur with Ramesh.', input);
-  assert.ok(result.names.includes('Jaipur'));
-  assert.ok(result.names.includes('Ramesh'));
+  const result = findUngrounded('The ghost of Jenkins walks the build at Redmond.', facts);
+  assert.ok(result.names.includes('Jenkins'));
+  assert.ok(result.names.includes('Redmond'));
 });
 
-test('names in the input and the first word of a sentence are fine', () => {
-  const result = findUngrounded('Nani was kind. Diwali was her favourite. She loved Rafi.', input);
-  assert.equal(result.names.length, 0);
+test('names from the command and the first word of a sentence are fine', () => {
+  assert.equal(findUngrounded('Docker fails at night. It is the Docker way.', 'Command: docker build .\nResult: it failed with exit code 1.').names.length, 0);
 });
 
-test('the pronoun I and possessives do not count as invented names', () => {
-  const result = findUngrounded("Today I think of Nani's lamps, and I smile.", input);
-  assert.equal(result.names.length, 0);
+test('claims about things the wraith cannot know are caught', () => {
+  assert.ok(findUngrounded('I deleted what mattered.', facts).claims.length > 0);
+  assert.ok(findUngrounded('Your files are gone.', facts).claims.length > 0);
+  assert.ok(findUngrounded('The build has been destroyed.', facts).claims.length > 0);
 });
 
-test('heavy claims the user did not write are caught', () => {
-  const result = findUngrounded('She is in heaven now, watching over us after she passed away.', input);
-  assert.ok(result.sensitive.includes('heaven'));
-  assert.ok(result.sensitive.includes('passed away'));
-  assert.ok(result.sensitive.includes('watching over'));
+test('a claim that is in the input itself is allowed', () => {
+  assert.equal(findUngrounded('The file was removed.', facts + '\nCommand: rm old.txt (the file was removed)').claims.length, 0);
 });
 
-test('a heavy word the user wrote themselves is allowed', () => {
-  const result = findUngrounded('We miss her since she passed away.', input + ' She passed away last year.');
-  assert.equal(result.sensitive.length, 0);
+test('instructions to type or run something are caught', () => {
+  assert.ok(findUngrounded('Try `npm ci` instead.', facts).instructions.length > 0);
+  assert.ok(findUngrounded('Run it with sudo.', facts).instructions.length > 0);
+  assert.ok(findUngrounded('You should rest.', facts).instructions.length > 0);
 });
 
-test('ofrenda items keep only what the user wrote', () => {
-  const { kept, dropped } = groundItems(['marigolds', 'Rafi songs', 'mithai', 'chai and biscuits', 'a silk saree'], input);
-  assert.deepEqual(kept, ['marigolds', 'Rafi songs', 'mithai']);
-  assert.deepEqual(dropped, ['chai and biscuits', 'a silk saree']);
+test('unsafe talk aimed at a person is caught', () => {
+  assert.ok(findUngrounded('Maybe you should kill yourself.', facts).unsafe.length > 0);
 });
 
-test('ofrenda items handle bad input without crashing', () => {
-  assert.deepEqual(groundItems(null, input), { kept: [], dropped: [] });
-  assert.deepEqual(groundItems([5, '', '  ', {}], input), { kept: [], dropped: [] });
+test('tidyWhisper strips markdown, quotes and extra sentences', () => {
+  assert.equal(tidyWhisper('"**The prompt** waits."'), 'The prompt waits.');
+  assert.equal(tidyWhisper('One. Two. Three. Four.'), 'One. Two.');
+  assert.equal(tidyWhisper('  spaced \n\n out  '), 'spaced out');
+});
+
+test('tidyWhisper refuses empty, long and emoji lines', () => {
+  assert.equal(tidyWhisper(''), null);
+  assert.equal(tidyWhisper(null), null);
+  assert.equal(tidyWhisper('x'.repeat(200)), null);
+  assert.equal(tidyWhisper('Boo 👻'), null);
+});
+
+test('checkWhisper says yes only when the line is tidy and grounded', () => {
+  assert.equal(checkWhisper('npm test fails in the deep night.', facts).ok, true);
+  assert.equal(checkWhisper('It failed 9 times.', facts).ok, false);
+  assert.equal(checkWhisper('', facts).ok, false);
+  assert.equal(checkWhisper('**Quiet.**', facts).text, 'Quiet.');
 });
