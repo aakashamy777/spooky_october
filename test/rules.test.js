@@ -84,3 +84,35 @@ test('odd input does not crash', () => {
   assert.equal(judge(undefined), null);
   assert.equal(judge('echo "unterminated'), null);
 });
+
+test('writing raw bytes to a device or formatting a disk is a danger', () => {
+  assert.equal(idOf('dd if=image.iso of=/dev/disk2 bs=1m'), 'dd-device');
+  assert.equal(idOf('sudo dd if=/dev/zero of=/dev/sda'), 'dd-device');
+  assert.equal(idOf('mkfs.ext4 /dev/sdb1'), 'format-disk');
+  assert.equal(idOf('diskutil eraseDisk JHFS+ Name disk3'), 'format-disk');
+  assert.equal(levelOf('dd if=a of=/dev/disk2'), 'danger');
+});
+
+test('dd to an ordinary file and read-only disk commands are fine', () => {
+  assert.equal(judge('dd if=/dev/zero of=./test.img bs=1m count=10'), null);
+  assert.equal(judge('diskutil list'), null);
+});
+
+test('opening up permissions on a whole tree is flagged', () => {
+  assert.equal(idOf('chmod -R 777 ./public'), 'chmod-open');
+  assert.equal(idOf('chmod -R a+rwx build'), 'chmod-open');
+  assert.equal(idOf('chmod -R 777 /'), 'chmod-system');
+  assert.equal(levelOf('chmod -R 777 ~'), 'danger');
+  assert.equal(idOf('chown -R me:me /usr'), 'chown-system');
+});
+
+test('normal chmod and chown are fine', () => {
+  for (const line of ['chmod +x script.sh', 'chmod 644 file', 'chmod -R 755 ./public', 'chown -R me:me ./project', 'chmod 777 file']) {
+    assert.equal(judge(line), null, line);
+  }
+});
+
+test('shutdown and reboot are a caution', () => {
+  assert.equal(idOf('shutdown -h now'), 'power-off');
+  assert.equal(idOf('reboot'), 'power-off');
+});
