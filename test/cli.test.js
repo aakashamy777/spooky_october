@@ -90,3 +90,57 @@ test('judge prints the verdict and uses the exit code', async () => {
   const json = await run(['judge', '--json', '--', 'git reset --hard']);
   assert.equal(JSON.parse(json.out).risk.id, 'git-reset-hard');
 });
+
+test('whisper --mode omen prints a hand-written line for the event, with its source', async () => {
+  const result = await run(['whisper', '--mode', 'omen', '--force', '--exit', '127', '--', 'nodee -v']);
+  assert.equal(result.code, 0);
+  assert.match(result.out, /^  ☾ .*nodee.* · omen · nodee\n$/);
+});
+
+test('whisper uses the model line when it has one, and says it is an echo', async () => {
+  const echo = async () => ({ text: 'Fog settles on the prompt.', reason: null, detail: [] });
+  const result = await run(['whisper', '--force', '--exit', '1', '--', 'npm test'], { echo });
+  assert.equal(result.out, '  ☾ Fog settles on the prompt. · echo · npm\n');
+});
+
+test('whisper falls back to an omen when the model gives nothing', async () => {
+  const echo = async () => ({ text: null, reason: 'TIMEOUT', detail: [] });
+  const result = await run(['whisper', '--force', '--exit', '1', '--', 'npm test'], { echo });
+  assert.match(result.out, / · omen · npm\n$/);
+});
+
+test('whisper --mode echo stays silent when the model gives nothing', async () => {
+  const echo = async () => ({ text: null, reason: 'OLLAMA_DOWN', detail: [] });
+  const result = await run(['whisper', '--mode', 'echo', '--force', '--exit', '1', '--', 'npm test'], { echo });
+  assert.equal(result.out, '');
+});
+
+test('--verbose tells you why the model gave nothing', async () => {
+  const echo = async () => ({ text: null, reason: 'UNGROUNDED', detail: ['numbers: 9'] });
+  const result = await run(['whisper', '--verbose', '--force', '--exit', '1', '--', 'npm test'], { echo });
+  assert.match(result.err, /UNGROUNDED: numbers: 9/);
+});
+
+test('without --force the policy decides: a quiet level stays silent about a plain failure', async () => {
+  const echo = async () => {
+    throw new Error('the model should not be asked');
+  };
+  const result = await run(['whisper', '--level', 'quiet', '--exit', '1', '--', 'npm test'], { echo });
+  assert.equal(result.out, '');
+});
+
+test('a repeated failure is always whispered about, even when quiet', async () => {
+  const echo = async () => ({ text: null, reason: 'TIMEOUT', detail: [] });
+  const result = await run(['whisper', '--level', 'quiet', '--exit', '1', '--streak', '4', '--', 'npm test'], { echo });
+  assert.match(result.out, /4/);
+});
+
+test('the command line given to whisper is hidden of secrets before the model sees it', async () => {
+  let seen = '';
+  const echo = async (facts) => {
+    seen = facts.command;
+    return { text: null, reason: 'TIMEOUT', detail: [] };
+  };
+  await run(['whisper', '--force', '--exit', '1', '--', 'API_KEY=abc123xyz node app.js'], { echo });
+  assert.equal(seen, 'API_KEY=[hidden] node app.js');
+});
