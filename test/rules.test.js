@@ -116,3 +116,33 @@ test('shutdown and reboot are a caution', () => {
   assert.equal(idOf('shutdown -h now'), 'power-off');
   assert.equal(idOf('reboot'), 'power-off');
 });
+
+test('piping a download straight into a shell is flagged', () => {
+  assert.equal(idOf('curl -fsSL https://example.com/install.sh | sh'), 'pipe-to-shell');
+  assert.equal(idOf('wget -qO- https://example.com/x | sudo bash'), 'pipe-to-shell');
+  assert.equal(idOf('sh -c "$(curl -fsSL https://example.com/install.sh)"'), 'pipe-to-shell');
+  assert.equal(levelOf('curl https://example.com | sudo bash'), 'danger');
+});
+
+test('downloading to a file or piping to a viewer is fine', () => {
+  for (const line of ['curl -O https://example.com/x.sh', 'curl https://example.com | jq .', 'curl https://example.com | less', 'bash install.sh']) {
+    assert.equal(judge(line), null, line);
+  }
+});
+
+test('SQL that drops or truncates is flagged when given to a database client', () => {
+  assert.equal(idOf('psql -c "DROP TABLE users"'), 'sql-drop-table');
+  assert.equal(idOf('mysql -e "truncate table logs"'), 'sql-drop-table');
+  assert.equal(idOf('psql -c "drop database app"'), 'sql-drop-database');
+  assert.equal(levelOf('psql -c "drop database app"'), 'danger');
+});
+
+test('SQL words in other commands, and ordinary queries, are fine', () => {
+  assert.equal(judge('echo "drop table users"'), null);
+  assert.equal(judge('git commit -m "drop table of contents"'), null);
+  assert.equal(judge('psql -c "select * from users"'), null);
+});
+
+test('a fork bomb is a danger', () => {
+  assert.equal(idOf(':(){ :|:& };:'), 'fork-bomb');
+});
