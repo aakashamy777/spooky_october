@@ -27,6 +27,14 @@ test('a number spelled as a word must match a real number too', () => {
   assert.equal(findUngrounded('Twice is a coincidence.', facts).numbers.length, 1);
 });
 
+test('larger spelled numbers are checked too, including two-part ones', () => {
+  assert.deepEqual(findUngrounded('Thirty one seconds, and it failed.', facts).numbers, ['thirty one']);
+  assert.deepEqual(findUngrounded('Twenty-two seconds.', facts).numbers, ['twenty two']);
+  assert.deepEqual(findUngrounded('Fifteen times.', facts).numbers, ['fifteen']);
+  // 22 is in the input, so "twenty two" is true there.
+  assert.equal(findUngrounded('Twenty-two seconds.', 'It ran for 22 seconds.').numbers.length, 0);
+});
+
 test('an invented name or place is caught', () => {
   const result = findUngrounded('The ghost of Jenkins walks the build at Redmond.', facts);
   assert.ok(result.names.includes('Jenkins'));
@@ -41,6 +49,7 @@ test('claims about things the wraith cannot know are caught', () => {
   assert.ok(findUngrounded('I deleted what mattered.', facts).claims.length > 0);
   assert.ok(findUngrounded('Your files are gone.', facts).claims.length > 0);
   assert.ok(findUngrounded('The build has been destroyed.', facts).claims.length > 0);
+  assert.ok(findUngrounded('Changes are made. Data is lost.', facts).claims.length > 0);
 });
 
 test('a claim that is in the input itself is allowed', () => {
