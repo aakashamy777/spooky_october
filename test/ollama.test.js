@@ -56,7 +56,7 @@ test('generateText sends the prompt with a short cap and keep_alive, and trims t
     assert.equal(sent.url, '/api/generate');
     assert.equal(sent.body.stream, false);
     assert.equal(sent.body.system, 's');
-    assert.equal(sent.body.keep_alive, '30m');
+    assert.equal(sent.body.keep_alive, '10m');
     assert.equal(sent.body.options.num_predict, 40);
   } finally {
     delete process.env.OLLAMA_URL;
@@ -101,5 +101,22 @@ test('nothing listening gives OLLAMA_DOWN', async () => {
     await assert.rejects(generateText({ prompt: 'p', timeoutMs: 2000 }), { code: 'OLLAMA_DOWN' });
   } finally {
     delete process.env.OLLAMA_URL;
+  }
+});
+
+test('WRAITH_KEEP_ALIVE changes how long the model stays loaded', async () => {
+  const fake = await fakeOllama((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ response: 'ok' }));
+  });
+  process.env.OLLAMA_URL = fake.url;
+  process.env.WRAITH_KEEP_ALIVE = '1m';
+  try {
+    await generateText({ prompt: 'p' });
+    assert.equal(fake.seen[0].body.keep_alive, '1m');
+  } finally {
+    delete process.env.OLLAMA_URL;
+    delete process.env.WRAITH_KEEP_ALIVE;
+    fake.server.close();
   }
 });
