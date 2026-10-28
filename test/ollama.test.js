@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const { generateText, isLoopbackUrl } = require('../lib/ollama');
+const { generateText, health, isLoopbackUrl } = require('../lib/ollama');
 
 // A stand-in for Ollama. `handler` decides what each request gets.
 function fakeOllama(handler) {
@@ -118,5 +118,40 @@ test('WRAITH_KEEP_ALIVE changes how long the model stays loaded', async () => {
     delete process.env.OLLAMA_URL;
     delete process.env.WRAITH_KEEP_ALIVE;
     fake.server.close();
+  }
+});
+
+test('health says ready when the model is installed, with or without :latest', async () => {
+  const fake = await fakeOllama((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ models: [{ name: 'gemma3:4b' }, { name: 'tiny:latest' }] }));
+  });
+  process.env.OLLAMA_URL = fake.url;
+  try {
+    assert.deepEqual((await health()).status, 'ready');
+    process.env.WRAITH_MODEL = 'tiny';
+    assert.deepEqual((await health()).status, 'ready');
+    process.env.WRAITH_MODEL = 'missing:1b';
+    const missing = await health();
+    assert.equal(missing.status, 'model_missing');
+    assert.match(missing.message, /ollama pull missing:1b/);
+  } finally {
+    delete process.env.OLLAMA_URL;
+    delete process.env.WRAITH_MODEL;
+    fake.server.close();
+  }
+});
+
+test('health reports a stopped Ollama and a non-local address without a stack trace', async () => {
+  const fake = await fakeOllama(() => {});
+  const url = fake.url;
+  await new Promise((resolve) => fake.server.close(resolve));
+  process.env.OLLAMA_URL = url;
+  try {
+    assert.equal((await health()).status, 'ollama_down');
+    process.env.OLLAMA_URL = 'http://192.0.2.1:11434';
+    assert.equal((await health()).status, 'not_loopback');
+  } finally {
+    delete process.env.OLLAMA_URL;
   }
 });
