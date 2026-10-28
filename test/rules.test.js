@@ -146,3 +146,29 @@ test('SQL words in other commands, and ordinary queries, are fine', () => {
 test('a fork bomb is a danger', () => {
   assert.equal(idOf(':(){ :|:& };:'), 'fork-bomb');
 });
+
+test('redirects are read as files, not as words', () => {
+  const [seg] = segments('echo hi > out.txt 2>&1');
+  assert.deepEqual(seg.words, ['echo', 'hi']);
+  assert.deepEqual(seg.redirects, [{ op: '>', target: 'out.txt' }]);
+  assert.deepEqual(segments('cat < in.txt >> log')[0].redirects, [{ op: '<', target: 'in.txt' }, { op: '>>', target: 'log' }]);
+  assert.deepEqual(segments('cmd &> all.log')[0].redirects, [{ op: '>', target: 'all.log' }]);
+});
+
+test('replacing a shell or ssh config with > is a caution', () => {
+  assert.equal(idOf('echo "export X=1" > ~/.zshrc'), 'overwrite-config');
+  assert.equal(idOf('cat key.pub > ~/.ssh/authorized_keys'), 'overwrite-config');
+  assert.equal(idOf('echo x >/etc/hosts'), 'overwrite-config');
+  assert.equal(idOf('> ~/.gitconfig'), 'overwrite-config');
+});
+
+test('appending to a config and ordinary redirects are fine', () => {
+  for (const line of ['echo "export X=1" >> ~/.zshrc', 'ls > files.txt', 'cmd > /dev/null 2>&1', 'echo hi > notes/zshrc.txt']) {
+    assert.equal(judge(line), null, line);
+  }
+});
+
+test('redirecting onto a disk device is a danger', () => {
+  assert.equal(idOf('cat image.iso > /dev/disk2'), 'redirect-device');
+  assert.equal(levelOf('echo x > /dev/sda'), 'danger');
+});
