@@ -84,3 +84,14 @@ test('typewrite stays within its time limit on a terminal', async () => {
   assert.equal(chunks.join(''), 'x'.repeat(60));
   assert.ok(Date.now() - started < 1200);
 });
+
+test('typewrite sends colour codes whole and only counts visible characters', async () => {
+  const chunks = [];
+  const stream = { isTTY: true, write: (text) => chunks.push(text) };
+  await colour.typewrite(stream, colour.paint('violet', 'ab'), { maxMs: 100 });
+  assert.equal(chunks.length, 4);
+  assert.match(chunks[0], /^\u001b\[38;5;141m$/);
+  assert.equal(chunks[1], 'a');
+  assert.equal(chunks[2], 'b');
+  assert.equal(chunks[3], '\u001b[0m');
+});
