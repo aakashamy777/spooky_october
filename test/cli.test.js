@@ -144,3 +144,57 @@ test('the command line given to whisper is hidden of secrets before the model se
   await run(['whisper', '--force', '--exit', '1', '--', 'API_KEY=abc123xyz node app.js'], { echo });
   assert.equal(seen, 'API_KEY=[hidden] node app.js');
 });
+
+test('doctor says what is ready and exits 0 when everything is', async () => {
+  const ready = async () => ({ ok: true, status: 'ready', message: 'gemma3:4b is ready at http://127.0.0.1:11434' });
+  const result = await run(['doctor'], { health: ready, zshVersion: () => '5.9', env: { WRAITH_LOADED: '1' } });
+  assert.equal(result.code, 0);
+  assert.match(result.out, /✓ model\s+gemma3:4b is ready/);
+  assert.match(result.out, /✓ zsh\s+version 5.9/);
+  assert.match(result.out, /✓ hook\s+loaded in this terminal/);
+});
+
+test('doctor names the fix when the model is missing, and exits 1', async () => {
+  const missing = async () => ({ ok: false, status: 'model_missing', message: 'The model gemma3:4b is not installed. Run: ollama pull gemma3:4b' });
+  const result = await run(['doctor'], { health: missing, zshVersion: () => '5.9' });
+  assert.equal(result.code, 1);
+  assert.match(result.out, /ollama pull gemma3:4b/);
+  assert.match(result.out, /still speaks, using its hand-written omens/);
+  assert.match(result.out, /not loaded in this terminal/);
+});
+
+test('doctor says when Ollama is not running', async () => {
+  const down = async () => ({ ok: false, status: 'ollama_down', message: 'Ollama is not answering. Open the Ollama app or run: ollama serve' });
+  const result = await run(['doctor'], { health: down, zshVersion: () => null });
+  assert.equal(result.code, 1);
+  assert.match(result.out, /✗ ollama\s+Ollama is not answering/);
+  assert.match(result.out, /✗ zsh\s+zsh was not found/);
+});
+
+test('init prints a single source line pointing at the hook, and edits nothing', async () => {
+  const { HOOK_PATH } = require('../lib/cli');
+  const result = await run(['init']);
+  assert.match(result.out, new RegExp(`source "${HOOK_PATH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+  assert.match(result.out, /~\/\.zshrc/);
+});
+
+test('exorcise finds the lines that load wraith and does not touch the file', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wraith-test-'));
+  const rc = path.join(dir, '.zshrc');
+  const original = 'export A=1\nsource "/x/wraith/shell/wraith.zsh"\nalias ll="ls -l"\n';
+  fs.writeFileSync(rc, original);
+  try {
+    const result = await run(['exorcise'], { env: { ZDOTDIR: dir } });
+    assert.match(result.out, /line 2:.*wraith\.zsh/);
+    assert.match(result.out, /nothing else to delete/);
+    assert.equal(fs.readFileSync(rc, 'utf8'), original);
+
+    const none = await run(['exorcise'], { env: { ZDOTDIR: path.join(dir, 'missing') } });
+    assert.match(none.out, /No line mentioning wraith\.zsh/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
