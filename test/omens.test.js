@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { OMENS, omenFor, gateOmen, fill } = require('../lib/omens');
+const { OMENS, EPITAPHS, omenFor, gateOmen, epitaphOmen, fill } = require('../lib/omens');
 const { buildFacts } = require('../lib/facts');
 
 const KNOWN_PLACEHOLDERS = new Set(['name', 'exit', 'seconds', 'streak', 'cwd', 'part']);
@@ -80,4 +80,16 @@ test('no placeholder is left in any omen that is shown', () => {
 test('the gate always has a line to say', () => {
   assert.ok(gateOmen('rm -rf /').length > 0);
   assert.equal(gateOmen('rm -rf /'), gateOmen('rm -rf /'));
+});
+
+test('fallback epitaphs name the tool and only claim what is known', () => {
+  assert.ok(EPITAPHS.length >= 5);
+  for (let seed = 0; seed < EPITAPHS.length; seed++) {
+    const line = epitaphOmen({ name: 'gulp', uses: 8 }, seed);
+    assert.doesNotMatch(line, /[{}]/);
+    assert.ok(line.length <= 60, line);
+    assert.doesNotMatch(line, /\b(deleted|broken|dead|died|killed)\b/i, line);
+  }
+  assert.equal(epitaphOmen({ name: 'gulp', uses: 8 }, 0), 'gulp. 8 times, and then never again.');
+  assert.equal(epitaphOmen({ name: 'gulp', uses: 8 }), epitaphOmen({ name: 'gulp', uses: 8 }));
 });
