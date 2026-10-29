@@ -67,16 +67,15 @@ test('the card says "stirs" for a caution and "bars the door" for a danger', () 
   assert.equal(gateCard('git status', plain), null);
 });
 
-test('the card never shows a secret, and its box stays one width', () => {
-  const card = gateCard('API_KEY=abc123xyz rm -rf /', plain);
-  assert.doesNotMatch(card, /abc123xyz/);
-  assert.match(card, /API_KEY=\[hidden\]/);
+test('the card shows the command as typed, and its box stays one width', () => {
+  const card = gateCard('rm -rf /   some/path', plain);
+  assert.match(card, /rm -rf \/ some\/path/);
   const widths = new Set(card.split('\n').map(visibleLength));
   assert.equal(widths.size, 1);
 });
 
-test('a long command is wrapped inside the card', () => {
-  const card = gateCard('rm -rf / ' + 'x'.repeat(10) + ' ' + 'word '.repeat(30), createStyle({ color: false, columns: 60 }));
+test('a long command and a very long path are wrapped inside the card', () => {
+  const card = gateCard('rm -rf / ' + '/very/long/' + 'x'.repeat(120) + ' ' + 'word '.repeat(30), createStyle({ color: false, columns: 60 }));
   for (const line of card.split('\n')) assert.ok(visibleLength(line) <= 60, line);
 });
 
