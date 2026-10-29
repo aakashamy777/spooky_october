@@ -84,3 +84,36 @@ test('each call is given one image and one tone to build on', async () => {
   await echoFor(facts, { generate: model.generate, random: () => 0 });
   assert.match(model.calls[0].prompt, /Tone: cold and patient\. Image: a candle\./);
 });
+
+const { epitaphFor, epitaphFacts, EPITAPH_SYSTEM } = require('../lib/whisper');
+
+const gulp = { name: 'gulp', uses: 8, quietFor: { commands: 76 } };
+
+test('epitaph facts list only the tool, how often it was used and how long it has been quiet', () => {
+  assert.equal(epitaphFacts(gulp), 'Tool: gulp\nIt was used 8 times.\nIt has not been used in the last 76 commands.');
+  assert.match(epitaphFacts({ name: 'grunt', uses: 6, quietFor: { days: 200 } }), /not been used for 200 days/);
+});
+
+test('a good epitaph is kept, and the prompt carries the facts and an image', async () => {
+  const model = scripted('Gulp kept the lantern lit through many winters.');
+  const result = await epitaphFor(gulp, { generate: model.generate, random: () => 0 });
+  assert.equal(result.text, 'Gulp kept the lantern lit through many winters.');
+  assert.equal(model.calls[0].system, EPITAPH_SYSTEM);
+  assert.match(model.calls[0].prompt, /Tool: gulp/);
+  assert.match(model.calls[0].prompt, /Image: a candle/);
+});
+
+test('an epitaph with an invented number or reason is rejected', async () => {
+  const model = scripted('It served for 12 years.', 'It served well, then Webpack came.');
+  const result = await epitaphFor(gulp, { generate: model.generate });
+  assert.equal(result.text, null);
+  assert.equal(result.reason, 'UNGROUNDED');
+  assert.match(result.detail[0], /numbers: 12/);
+  assert.match(result.detail[1], /names: Webpack/);
+});
+
+test('the number of uses that is true may be used in an epitaph', async () => {
+  const model = scripted('Eight times it answered, and then the quiet came.');
+  const result = await epitaphFor(gulp, { generate: model.generate });
+  assert.equal(result.text, 'Eight times it answered, and then the quiet came.');
+});
