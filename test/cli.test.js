@@ -240,7 +240,7 @@ test('an epitaph the check rejects falls back for that card only', async () => {
   const result = await run(['ofrenda', '--history', DEMO], { epitaph, now: () => DEMO_NOW });
   assert.match(result.out, /python2 was here\./);
   const { epitaphOmen } = require('../lib/omens');
-  assert.ok(result.out.includes(epitaphOmen({ name: 'gulp', uses: 14 })));
+  assert.ok(result.out.includes(epitaphOmen({ name: 'gulp', uses: 14 }, 0)));
   assert.match(result.out, /· omen/);
 });
 
