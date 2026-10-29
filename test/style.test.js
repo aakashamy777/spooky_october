@@ -41,9 +41,10 @@ test('truecolor is used only when the terminal says so', () => {
   assert.equal(detect({ COLORTERM: 'truecolor', NO_COLOR: '1' }, tty).trueColor, false);
 });
 
-test('wrap breaks on spaces and keeps long words whole', () => {
+test('wrap breaks on spaces and cuts a word that is longer than a line', () => {
   assert.deepEqual(plain.wrap('one two three four', 9), ['one two', 'three', 'four']);
-  assert.deepEqual(plain.wrap('supercalifragilistic', 5), ['supercalifragilistic']);
+  assert.deepEqual(plain.wrap('supercalifragilistic', 5), ['super', 'calif', 'ragil', 'istic']);
+  assert.deepEqual(plain.wrap('ab supercalifragilistic cd', 8), ['ab', 'supercal', 'ifragili', 'stic cd']);
   assert.deepEqual(plain.wrap('a\nb', 10), ['a', 'b']);
 });
 
