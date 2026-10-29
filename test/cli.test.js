@@ -197,3 +197,80 @@ test('exorcise finds the lines that load wraith and does not touch the file', as
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+const DEMO = require('node:path').join(__dirname, '..', 'demo', 'history');
+const DEMO_NOW = Date.UTC(2026, 9, 31);
+
+test('ofrenda lists the dead commands in the demo history, most used first', async () => {
+  const epitaph = async (entry) => ({ text: `${entry.name} kept the lantern lit.`, reason: null, detail: [] });
+  const result = await run(['ofrenda', '--history', DEMO], { epitaph, now: () => DEMO_NOW });
+  assert.equal(result.code, 0);
+  const names = [...result.out.matchAll(/╭─ (\S+) /g)].map((m) => m[1]);
+  assert.deepEqual(names, ['gulp', 'python2', 'grunt', 'bower', 'heroku']);
+  assert.match(result.out, /used 14 times · quiet for 516 days/);
+  assert.match(result.out, /gulp kept the lantern lit\./);
+  assert.match(result.out, /5 remembered, from 425 commands/);
+});
+
+test('ofrenda --no-model uses hand-written epitaphs and never asks the model', async () => {
+  const epitaph = async () => {
+    throw new Error('the model should not be asked');
+  };
+  const result = await run(['ofrenda', '--history', DEMO, '--no-model'], { epitaph, now: () => DEMO_NOW });
+  assert.equal(result.code, 0);
+  assert.match(result.out, /· omen/);
+  assert.doesNotMatch(result.out, /· echo/);
+});
+
+test('ofrenda stops asking the model after it fails to answer, and still draws every card', async () => {
+  let asked = 0;
+  const epitaph = async () => {
+    asked++;
+    return { text: null, reason: 'TIMEOUT', detail: [] };
+  };
+  const result = await run(['ofrenda', '--history', DEMO], { epitaph, now: () => DEMO_NOW });
+  assert.equal(asked, 1);
+  assert.equal([...result.out.matchAll(/╭─ /g)].length, 5);
+});
+
+test('an epitaph the check rejects falls back for that card only', async () => {
+  const epitaph = async (entry) => (entry.name === 'gulp'
+    ? { text: null, reason: 'UNGROUNDED', detail: ['numbers: 12'] }
+    : { text: `${entry.name} was here.`, reason: null, detail: [] });
+  const result = await run(['ofrenda', '--history', DEMO], { epitaph, now: () => DEMO_NOW });
+  assert.match(result.out, /python2 was here\./);
+  const { epitaphOmen } = require('../lib/omens');
+  assert.ok(result.out.includes(epitaphOmen({ name: 'gulp', uses: 14 })));
+  assert.match(result.out, /· omen/);
+});
+
+test('ofrenda says what to do when there is no history file', async () => {
+  const result = await run(['ofrenda', '--history', '/nonexistent/history']);
+  assert.equal(result.code, 1);
+  assert.match(result.err, /could not read a history file/);
+  assert.match(result.err, /--history FILE/);
+});
+
+test('ofrenda reads only command names, so no secret from the history reaches the model', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const dir = fs.mkdtempSync(require('node:path').join(os.tmpdir(), 'wraith-hist-'));
+  const file = require('node:path').join(dir, 'history');
+  const lines = [];
+  for (let i = 0; i < 6; i++) lines.push(`: ${1700000000 + i}:0;curl -u admin:hunter2 https://example.com/${i}`);
+  for (let i = 0; i < 30; i++) lines.push(`: ${1760000000 + i}:0;npm test`);
+  fs.writeFileSync(file, lines.join('\n') + '\n');
+  const seen = [];
+  const epitaph = async (entry) => {
+    seen.push(JSON.stringify(entry));
+    return { text: null, reason: 'TIMEOUT', detail: [] };
+  };
+  try {
+    await run(['ofrenda', '--history', file], { epitaph, now: () => 1760100000 * 1000 });
+    assert.equal(seen.length, 1);
+    assert.doesNotMatch(seen[0], /hunter2|admin|example\.com/);
+    assert.match(seen[0], /"name":"curl"/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
