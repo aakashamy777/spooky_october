@@ -140,3 +140,54 @@ test('a plain non-interactive shell loads nothing', { skip: !available }, () => 
   assert.equal(result.stdout.trim(), 'loaded=no');
   assert.equal(result.stderr, '');
 });
+
+const CHAIN_SCRIPT = String.raw`
+fconfigure stdout -buffering none
+set timeout 10
+spawn zsh -i
+stty sane < $spawn_out(slave,name)
+expect "% "
+send "echo plain\r"
+expect "plain"
+puts "\nMARK ran"
+sleep 0.5
+send "git clean -fdx\r"
+expect "Let it run"
+sleep 0.7
+send "n"
+expect "it stays where it is"
+puts "\nMARK gate-still-works"
+sleep 0.5
+send "\025"
+sleep 0.5
+send "exit\r"
+expect eof
+`;
+
+test('an accept-line widget that was already there still runs, and the gate still works', { skip: !available, timeout: 60000 }, () => {
+  const home = fs.mkdtempSync('/tmp/wr-');
+  fs.writeFileSync(path.join(home, '.zshrc'), [
+    "PROMPT='%# '",
+    'HISTFILE=/dev/null',
+    'my-accept() { print -r -- "[mine ran]"; zle .accept-line }',
+    'zle -N accept-line my-accept',
+    `source "${HOOK}"`,
+    '',
+  ].join('\n'));
+  fs.writeFileSync(path.join(home, 'chain.exp'), CHAIN_SCRIPT);
+  try {
+    const result = spawnSync('expect', [path.join(home, 'chain.exp')], {
+      encoding: 'utf8',
+      timeout: 50000,
+      killSignal: 'SIGKILL',
+      cwd: home,
+      env: { PATH: process.env.PATH, HOME: home, ZDOTDIR: home, TERM: 'xterm', LANG: 'en_US.UTF-8', NO_COLOR: '1', OLLAMA_URL: 'http://127.0.0.1:9' },
+    });
+    const transcript = (result.stdout || '').replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '');
+    assert.match(transcript, /\[mine ran\]/, transcript.slice(-1500));
+    const marks = [...transcript.matchAll(/^MARK (\S+)/gm)].map((m) => m[1]);
+    assert.deepEqual(marks, ['ran', 'gate-still-works'], transcript.slice(-1500));
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});

@@ -107,7 +107,8 @@ _wraith_accept_line() {
       fi
     fi
   fi
-  zle .accept-line
+  # Hand over to whatever accept-line was before us, so another plugin that wraps it keeps working.
+  zle _wraith_inner_accept_line
 }
 
 # ---- `wraith on`, `wraith off`, `wraith level`: these change this shell, so the shell must handle them ----
@@ -142,5 +143,6 @@ wraith() {
 add-zsh-hook preexec _wraith_preexec
 precmd_functions=(_wraith_precmd ${precmd_functions:#_wraith_precmd})
 if [[ -o zle ]]; then
+  zle -A accept-line _wraith_inner_accept_line
   zle -N accept-line _wraith_accept_line
 fi
