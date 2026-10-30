@@ -21,8 +21,11 @@ if [[ ! -x $WRAITH_BIN ]] || ! (( ${+commands[node]} )); then
   return 0
 fi
 
+if ! zmodload zsh/datetime 2>/dev/null; then
+  print -u2 -- "wraith: this zsh has no zsh/datetime module, so the wraith stays asleep."
+  return 0
+fi
 source "${${(%):-%x}:A:h}/wraith-core.zsh"
-zmodload zsh/datetime 2>/dev/null
 autoload -Uz add-zsh-hook
 
 typeset -gi _wraith_on=1
