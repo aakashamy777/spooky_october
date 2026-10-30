@@ -28,7 +28,7 @@ test('ordinary commands are not risky', () => {
 });
 
 test('rm -rf on a whole system or home directory is a danger', () => {
-  for (const line of ['rm -rf /', 'rm -rf ~', 'rm -rf ~/', 'rm -rf $HOME', 'rm -fr "$HOME"', 'rm -r -f .', 'rm -Rf *', 'rm -rf /usr', 'rm -rf /Users/aakash', 'rm --recursive --force /']) {
+  for (const line of ['rm -rf /', 'rm -rf ~', 'rm -rf ~/', 'rm -rf $HOME', 'rm -fr "$HOME"', 'rm -r -f .', 'rm -Rf *', 'rm -rf /usr', 'rm -rf /Users/me', 'rm --recursive --force /']) {
     assert.equal(idOf(line), 'rm-catastrophic', line);
     assert.equal(levelOf(line), 'danger', line);
   }
