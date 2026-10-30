@@ -6,7 +6,8 @@
     "wraith": "bin/wraith"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "measure": "node scripts/measure.js"
   },
   "license": "MIT",
   "engines": {
