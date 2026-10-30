@@ -63,3 +63,20 @@ test('the facts text contains only computed things', () => {
   assert.match(text, /3 times in a row/);
   assert.match(text, /deep night/);
 });
+
+test('grep finding nothing, or diff finding a difference, is an answer and not a failure', () => {
+  assert.equal(at(12, { command: 'grep -r TODO src', exit: 1 }).situation, 'quiet');
+  assert.equal(at(12, { command: 'diff a.txt b.txt', exit: 1 }).exit, 0);
+  assert.equal(at(12, { command: 'sudo grep root /etc/passwd', exit: 1 }).exit, 0);
+});
+
+test('but a real error from those programs is still a failure', () => {
+  assert.equal(at(12, { command: 'grep -r TODO nowhere', exit: 2 }).situation, 'failed');
+  assert.equal(at(12, { command: 'npm test', exit: 1 }).situation, 'failed');
+});
+
+test('a long session in an editor, a pager or ssh is not a slow command', () => {
+  assert.equal(at(12, { command: 'vim notes.md', seconds: 900 }).situation, 'quiet');
+  assert.equal(at(12, { command: 'ssh me@host', seconds: 4000 }).seconds, 0);
+  assert.equal(at(12, { command: 'make build', seconds: 900 }).situation, 'slow');
+});
