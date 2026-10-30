@@ -45,6 +45,9 @@ _wraith_precmd() {
   local secs=$(( EPOCHSECONDS - _wraith_start ))
   _wraith_cmd=''
 
+  _wraith_adjust $code $secs "$cmd"
+  code=$_wraith_code
+  secs=$_wraith_secs
   _wraith_track $code "$cmd"
   (( _wraith_on )) || return 0
   [[ $cmd == wraith || $cmd == wraith\ * ]] && return 0

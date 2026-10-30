@@ -2,7 +2,7 @@
 # shell/wraith.zsh wires them into zsh. They are kept apart so they can be tested without a terminal.
 
 typeset -g WRAITH_LEVEL="${WRAITH_LEVEL:-normal}"
-typeset -gi _wraith_streak=0
+typeset -gi _wraith_streak=0 _wraith_code=0 _wraith_secs=0
 typeset -g _wraith_failed_cmd=''
 
 # A cheap first look at a command line, in pure zsh, so ordinary commands never wake node.
@@ -18,6 +18,34 @@ _wraith_coarse_re+='|>|:[[:space:]]*\(\)'
 # 0 if the line might be risky.
 _wraith_coarse() {
   [[ $1 =~ $_wraith_coarse_re ]]
+}
+
+# Some programs exit with 1 to give an answer (grep found nothing), and some are sat in on purpose
+# (vim, ssh). These must match ANSWERS_WITH_ONE and INTERACTIVE in lib/facts.js; a test compares them.
+typeset -g _wraith_answer_re='^(grep|egrep|fgrep|rg|ag|ack|diff|cmp|test|\[|\[\[|which|whence|type|pgrep|comm)$'
+typeset -g _wraith_interactive_re='^(vim|nvim|vi|view|nano|emacs|less|more|man|top|htop|btop|ssh|mosh|tmux|screen|watch|fzf|tig|lazygit)$'
+
+# The program in a command line, past variable assignments and wrappers like sudo.
+_wraith_program() {
+  local word
+  for word in ${(z)1}; do
+    [[ $word == [A-Za-z_]*=* ]] && continue
+    [[ $word == (sudo|doas|env|command|nohup|time|nice|exec|builtin) ]] && continue
+    REPLY=${word:t}
+    return 0
+  done
+  REPLY=''
+}
+
+# What the exit code and the seconds really mean for this command. Sets _wraith_code and _wraith_secs.
+# args: exit-code seconds command
+_wraith_adjust() {
+  _wraith_code=$1
+  _wraith_secs=$2
+  _wraith_program "$3"
+  [[ $REPLY =~ $_wraith_answer_re ]] && (( _wraith_code == 1 )) && _wraith_code=0
+  [[ $REPLY =~ $_wraith_interactive_re ]] && _wraith_secs=0
+  return 0
 }
 
 # Keep count of the same command failing again and again. Ctrl-C (130) is not a failure.

@@ -84,3 +84,26 @@ test('sourcing the core prints nothing', { skip: !hasZsh }, () => {
   assert.equal(result.out, '');
   assert.equal(result.err, '');
 });
+
+test('grep finding nothing is not a failure, but a real grep error is', { skip: !hasZsh }, () => {
+  const adjusted = (code, secs, cmd) => zsh('_wraith_adjust "$1" "$2" "$3"; print "$_wraith_code $_wraith_secs"', String(code), String(secs), cmd).out;
+  assert.equal(adjusted(1, 0, 'grep -r TODO src'), '0 0');
+  assert.equal(adjusted(1, 0, 'sudo grep root /etc/passwd'), '0 0');
+  assert.equal(adjusted(2, 0, 'grep -r TODO nowhere'), '2 0');
+  assert.equal(adjusted(1, 0, 'npm test'), '1 0');
+  assert.equal(adjusted(1, 0, 'FOO=1 diff a b'), '0 0');
+});
+
+test('time in an editor or ssh does not count as slow', { skip: !hasZsh }, () => {
+  const adjusted = (code, secs, cmd) => zsh('_wraith_adjust "$1" "$2" "$3"; print "$_wraith_code $_wraith_secs"', String(code), String(secs), cmd).out;
+  assert.equal(adjusted(0, 900, 'vim notes.md'), '0 0');
+  assert.equal(adjusted(0, 4000, 'ssh me@host'), '0 0');
+  assert.equal(adjusted(0, 900, 'make build'), '0 900');
+});
+
+test('the lists in zsh match the lists in node', { skip: !hasZsh }, () => {
+  const { ANSWERS_WITH_ONE, INTERACTIVE } = require('../lib/facts');
+  const adjusted = (code, secs, cmd) => zsh('_wraith_adjust "$1" "$2" "$3"; print "$_wraith_code $_wraith_secs"', String(code), String(secs), cmd).out;
+  for (const name of ANSWERS_WITH_ONE) assert.equal(adjusted(1, 0, `${name} x`), '0 0', `answers-with-one: ${name}`);
+  for (const name of INTERACTIVE) assert.equal(adjusted(0, 500, `${name} x`), '0 0', `interactive: ${name}`);
+});
