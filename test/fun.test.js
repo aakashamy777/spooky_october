@@ -95,3 +95,14 @@ test('side by side blocks line up', () => {
   const lines = fun.sideBySide([['ab', 'a'], ['cd']], 2);
   assert.deepEqual(lines, ['ab  cd', 'a']);
 });
+
+test('every epitaph the graveyard can pick fits on a stone without being cut', () => {
+  const fitting = fun.EPITAPHS.filter((text) => plain.wrap(text, 11).length <= 3);
+  assert.ok(fitting.length >= 5, `only ${fitting.length} epitaphs fit`);
+  for (let seed = 1; seed <= 40; seed++) {
+    const text = fun.haunt(fun.seeded(seed), plain, { scene: 'graveyard' }).text;
+    const squashed = text.replace(/[|\s]+/g, ' ');
+    const shown = fitting.filter((e) => squashed.includes(e.split(' ')[0]));
+    assert.ok(shown.length >= 2, `seed ${seed}: ${text}`);
+  }
+});
