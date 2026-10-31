@@ -116,6 +116,12 @@ function shots() {
     ofrenda: () => ['wraith ofrenda --history demo/history (a made-up history)',
       run(['ofrenda', '--history', path.join(ROOT, 'demo', 'history')])],
     doctor: () => ['wraith doctor', run(['doctor'])],
+    fun: () => ['the silly commands', [
+      ['wraith graveyard', ['graveyard', '--seed', '4']],
+      ['wraith haunt --scene pumpkins', ['haunt', '--scene', 'pumpkins', '--seed', '2']],
+      ['wraith say "hello from the machine"', ['say', 'hello from the machine', '--seed', '2']],
+      ['wraith haunt --scene cauldron', ['haunt', '--scene', 'cauldron', '--seed', '6']],
+    ].map(([label, args]) => `$ ${label}\n${run(args)}`).join('\n')],
     tests: () => ['npm test', (() => {
       const result = spawnSync('node', ['--test', '--test-reporter=spec'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' } });
       const lines = `${result.stdout}${result.stderr}`.trim().split('\n');
