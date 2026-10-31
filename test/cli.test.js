@@ -274,3 +274,78 @@ test('ofrenda reads only command names, so no secret from the history reaches th
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('help lists the silly commands', async () => {
+  const help = await run(['help']);
+  for (const name of ['haunt', 'graveyard', 'fortune', 'say', 'boo', 'rain', 'spider', 'ouija', 'trick', 'surprise']) {
+    assert.match(help.out, new RegExp(`wraith ${name}`));
+  }
+});
+
+test('haunt draws a scene, lists the scenes, and the same seed draws the same picture', async () => {
+  const list = await run(['haunt', '--list']);
+  assert.match(list.out, /graveyard/);
+  assert.match(list.out, /cauldron/);
+  const a = await run(['haunt', '--seed', '12']);
+  const b = await run(['haunt', '--seed', '12']);
+  assert.equal(a.code, 0);
+  assert.equal(a.out, b.out);
+  assert.ok(a.out.trim().length > 20);
+  const skull = await run(['haunt', '--scene', 'skull', '--seed', '1']);
+  assert.match(skull.out, /\(\) \(\)/);
+});
+
+test('graveyard, fortune and say print their pictures', async () => {
+  assert.match((await run(['graveyard', '--seed', '2'])).out, /R\.I\.P\./);
+  assert.match((await run(['fortune', '--seed', '2'])).out, /lucky number: \d+/);
+  const said = await run(['say', 'good', 'evening', '--seed', '2']);
+  assert.match(said.out, /good evening/);
+  assert.match(said.out, /\.-----\./);
+});
+
+test('boo, rain and spider finish at once when output is not a terminal', async () => {
+  assert.match((await run(['boo'])).out, /B O O !/);
+  assert.equal((await run(['rain', '--seed', '3'])).out.split('\n').length, 9);
+  assert.match((await run(['spider', '--seed', '3'])).out, /\(oo\)/);
+});
+
+test('ouija uses the question you give it, and asks when you give none', async () => {
+  const given = await run(['ouija', 'will', 'it', 'ship?', '--seed', '5']);
+  assert.match(given.out, /you asked: will it ship\?/);
+  let prompted = '';
+  const ask = async (prompt) => {
+    prompted = prompt;
+    return 'is anybody there?';
+  };
+  const asked = await run(['ouija', '--seed', '5'], { ask });
+  assert.match(prompted, /ask the spirits a question/);
+  assert.match(asked.out, /you asked: is anybody there\?/);
+});
+
+test('trick or treat reads a key, and a trick brings the ghost', async () => {
+  let sawTrick = false;
+  let sawTreat = false;
+  for (let seed = 1; seed <= 30 && !(sawTrick && sawTreat); seed++) {
+    const result = await run(['trick', '--seed', String(seed)], { askKey: async () => 't' });
+    assert.match(result.out, /you chose trick\./);
+    if (/TRICK!/.test(result.out)) {
+      sawTrick = true;
+      assert.match(result.out, /B O O !/);
+    }
+    if (/\b(compliment|chocolate|lollipop|cupcake|apple)\b/.test(result.out)) sawTreat = true;
+  }
+  assert.ok(sawTrick && sawTreat, 'both outcomes should be possible');
+  const treat = await run(['trick', '--seed', '1'], { askKey: async () => 'r' });
+  assert.match(treat.out, /you chose treat\./);
+});
+
+test('surprise picks something and says what it picked', async () => {
+  const result = await run(['surprise', '--seed', '4']);
+  assert.equal(result.code, 0);
+  assert.match(result.out, /the wraith chose: \w+/);
+  assert.ok(result.out.length > 60);
+});
+
+test('an unknown command is still refused', async () => {
+  assert.equal((await run(['summon'])).code, 2);
+});
