@@ -62,7 +62,7 @@ If a line fails twice, a hand-written line is shown instead. Every line is label
 | Needed a second try | 2 of 30 |
 | Median time per whisper, with retries | 3.7 s (p90 5.3 s) |
 | First request after the model was unloaded | about 10.8 s |
-| Tests | 166 passing, about 15 s |
+| Tests | 173 passing, about 15 s |
 
 A whisper is one model call of about 2.5 seconds, which is too slow to run before a prompt appears. That is why whispers arrive in the background and the first one after a long idle is usually an omen.
 
@@ -92,7 +92,7 @@ The line under each candle is written by Gemma and is sometimes wrong in a way t
 
 ## **What It Does Not Do**
 
-- **It is only tested on macOS with zsh 5.9.** Not bash, fish, Linux or Windows, and not alongside other `accept-line` plugins.
+- **It is only tested on macOS with zsh 5.9.** Not bash, fish, Linux or Windows, and not with real `accept-line` plugins (it chains to an existing widget, which a test checks).
 - **It is not a security boundary.** The gate only sees the line you press Enter on in an interactive zsh with the hook loaded. It does not see scripts, `eval`, aliases that expand later, `bash -c "..."` strings, or other terminals. It knows the patterns in `lib/rules.js`, not every dangerous thing, and `wraith off` turns it off.
 - **The check does not catch every invented detail.** It catches numbers, names, claims of action, instructions and unsafe talk. A line can still be wrong in meaning ("seven installations" for a tool called `bower`). Treat whispers as flavour, never as information.
 - **Redaction works by pattern.** An odd-shaped secret would reach the local model. It also hides full git commit ids, because it cannot tell them from keys.

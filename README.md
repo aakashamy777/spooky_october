@@ -79,13 +79,13 @@ On an Apple M3 with 8 GB, from `npm run measure` (details and caveats in [docs/M
 - Gemma's line passed the check **29 of 30** times; 2 of 30 needed a second try; once both tries failed and an omen was shown.
 - A whisper takes a median of **3.7 s** (p90 5.3 s) including retries. It arrives in the background, so it does not delay the prompt.
 - After the model has been unloaded, the first request took about **10.8 s** to load it, so a whisper right after a long idle spell is usually an omen.
-- **166 tests** pass in about 15 seconds, with no network and no model. One of them drives a real interactive zsh through `expect` (it is skipped where zsh or `expect` is missing).
+- **173 tests** pass in about 15 seconds, with no network and no model. One of them drives a real interactive zsh through `expect` (it is skipped where zsh or `expect` is missing).
 
 ![Test summary](docs/tests.png)
 
 ## What it does not do
 
-- **It is tested on macOS with zsh 5.9 only.** Not bash, fish, Linux or Windows. It has also not been tried alongside other `accept-line` plugins.
+- **It is tested on macOS with zsh 5.9 only.** Not bash, fish, Linux or Windows. It keeps working when an `accept-line` widget already exists (a test checks that), but I have not tried it with real plugins such as zsh-autosuggestions.
 - **It is not a security boundary.** The gate only sees the line you press Enter on in an interactive zsh where the hook is loaded. It does not see scripts, `eval`, aliases that expand later, `bash -c "..."` strings, or commands from other terminals. It knows the patterns in `lib/rules.js`, not every dangerous thing. `wraith off` turns it off.
 - **The check does not catch every invented detail.** It catches numbers, names, claims of action, instructions and unsafe talk. A line can still be wrong in meaning: the model once wrote "seven installations" for a tool whose name was only `bower`. Treat whispers as flavour, never as information.
 - **Redaction is pattern-based.** A secret in an odd shape reaches the local model. It also hides full git commit ids, because it cannot tell them from keys.
