@@ -24,7 +24,7 @@ How I read the theme: "ghost in the machine" is literal, a ghost in your shell t
 
 ## **Demo**
 
-REPLACE-WITH-VIDEO-LINK
+There is no hosted demo on purpose. Wraith lives in your own shell and its model runs on my laptop, so a public URL would defeat the point. You can try it in a throwaway shell in about two minutes; the steps are in the Code section.
 
 Pictures of the real output (these are the text the commands printed, drawn with their colours, not photos of a terminal window):
 
@@ -36,7 +36,7 @@ The history in that picture is made up (`demo/history`). I did not use anyone's 
 
 ## **Code**
 
-{% github aakashamy777/spooky_october %}
+{% embed https://github.com/aakashamy777/spooky_october %}
 
 Node 22 and zsh, no npm dependencies. To look around without touching your shell: `node bin/wraith gate -- git push --force origin main`, or `node bin/wraith ofrenda --history demo/history`.
 
