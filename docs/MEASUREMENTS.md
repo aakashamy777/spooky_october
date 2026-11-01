@@ -34,7 +34,7 @@ These are the three things the measuring turned up, in the order they happened:
 
 ## Tests
 
-`npm test` runs 173 tests in about 15 seconds. They need no network and no model. One of them starts a real interactive zsh and drives the hook through `expect`.
+`npm test` runs 200 tests in about 15 seconds. They need no network and no model. One of them starts a real interactive zsh and drives the hook through `expect`.
 
 ## What I did not measure
 

@@ -18,6 +18,22 @@ Made for the Hacktoberfest Open-Source AI Challenge, Week 4: "Ghost in the Machi
 
 ![The ofrenda](docs/ofrenda.png)
 
+**4. It is also a little silly.** Ten commands that need no model and no network, for when you just want something spooky on the screen:
+
+| | |
+| --- | --- |
+| `wraith haunt` | A random goofy horror picture: emoji rain, a graveyard, three ghosts, bats, a web and spider, pumpkins, a skull, a cauldron (`--scene NAME`, `--list`, `--seed N`) |
+| `wraith graveyard` / `fortune` | Tombstones with silly epitaphs ("Here lies Internet Explorer") / a spooky fortune cookie |
+| `wraith say <words>` | A ghost says it for you, in a speech bubble |
+| `wraith boo` / `rain` / `spider` | A ghost floats across your terminal / a rain of spooky emoji / a spider lowers itself on a thread |
+| `wraith ouija [question]` | Ask the spirits. Answers are spelled one letter at a time. It asks you if you give no question. |
+| `wraith trick` | Trick or treat: press a key, and the ghost may change its mind |
+| `wraith surprise` | The wraith picks one for you |
+
+On a terminal they animate. In a pipe or a log they print the finished picture at once. `--seed N` makes a picture repeatable.
+
+![The silly commands](docs/fun.png)
+
 ## The idea that makes it work on a small model
 
 A 4B model will happily invent a number, a name, or a claim. So **code decides every fact and the model only dresses it up.** The exit code, the seconds, how many times in a row the same command failed, and whether a command is dangerous are all worked out in code. Gemma is given those facts and asked for one eerie line. Then a check compares the line with the facts and throws it away if it contains a number (digits, or spelled out like "thirty one") or a name that is not in the facts, claims that something was run, deleted or fixed, instructions to type something, or unsafe talk. If the line fails twice, the hand-written omen is shown instead. The same check guards the ofrenda epitaphs.
@@ -79,7 +95,7 @@ On an Apple M3 with 8 GB, from `npm run measure` (details and caveats in [docs/M
 - Gemma's line passed the check **29 of 30** times; 2 of 30 needed a second try; once both tries failed and an omen was shown.
 - A whisper takes a median of **3.7 s** (p90 5.3 s) including retries. It arrives in the background, so it does not delay the prompt.
 - After the model has been unloaded, the first request took about **10.8 s** to load it, so a whisper right after a long idle spell is usually an omen.
-- **173 tests** pass in about 15 seconds, with no network and no model. One of them drives a real interactive zsh through `expect` (it is skipped where zsh or `expect` is missing).
+- **200 tests** pass in about 15 seconds, with no network and no model. One of them drives a real interactive zsh through `expect` (it is skipped where zsh or `expect` is missing).
 
 ![Test summary](docs/tests.png)
 
